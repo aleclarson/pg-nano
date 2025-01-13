@@ -91,6 +91,10 @@ export class Connection extends EventEmitter<ConnectionEvents> {
     options?: QueryOptions | null,
   ): QueryPromise<TResult> {
     const conn = unprotect(this)
+    if (!conn.pq) {
+      throw new PgNativeError('Connection closed')
+    }
+
     const query: QueryDescriptor = {
       id: uid(8),
       type,
