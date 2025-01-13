@@ -1,7 +1,11 @@
+import crypto from 'node:crypto'
 import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import type { ShallowOptions } from 'option-types'
 import type { Client } from 'pg-nano'
 import type { UserConfig } from 'pg-nano/config'
+import { parseConnectionString } from 'pg-native'
 import { map } from 'radashi'
 import { globSync } from 'tinyglobby'
 import type { PgBaseType, PgObjectStmt } from './config/plugin.js'
@@ -142,6 +146,9 @@ export class Project {
     await migrateSchema(env, droppedTables)
     await migrateStaticRows(pg, schema, droppedTables, names)
 
+    // TODO: only purge the cache if composite types have changed
+    purgeClientCache(pg)
+
     if (!options.noEmit) {
       await generate(
         env,
@@ -251,4 +258,35 @@ function flatMapProperties<T extends Record<string, any[]>>(objects: T[]): T {
     merged[key] = objects.flatMap(obj => obj[key]) as any
   }
   return merged
+}
+
+/**
+ * The “client cache” is a directory in the user's home directory that stores
+ * custom type parsers for a given database connection.
+ *
+ * Removing it ensures that new instances of `Client` for the configured
+ * database will re-introspect the database and generate new custom type
+ * parsers. For long-running processes, the `Client` instance may have its
+ * `reloadCustomTypes` method called, which will also re-generate the custom
+ * type parsers.
+ */
+function purgeClientCache(pg: Client) {
+  // TODO: use `PQconninfo` instead of making assumptions about default values
+  // @see https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PQCONNINFO
+  const {
+    host = process.env.PGHOST ?? 'localhost',
+    port = process.env.PGPORT ?? 5432,
+    dbname = process.env.PGDATABASE ?? 'postgres',
+  } = parseConnectionString(pg.dsn!)
+
+  const cacheDir = path.join(
+    os.homedir(),
+    `.pg-nano/${dbname}+${md5Hex(`${host}:${port}`)}`,
+  )
+
+  fs.rmSync(cacheDir, { recursive: true, force: true })
+}
+
+function md5Hex(value: string) {
+  return crypto.createHash('md5').update(value).digest('hex')
 }

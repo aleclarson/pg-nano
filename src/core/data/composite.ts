@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -14,7 +15,10 @@ export async function importCustomTypeParsers(
 ): Promise<Record<number, TextParser>> {
   // Runtime-generated modules are stored in the user's home directory, so that
   // pg-nano's "dev" command can purge them when the schema changes.
-  const cacheDir = path.join(os.homedir(), `.pg-nano/${host}+${port}+${dbname}`)
+  const cacheDir = path.join(
+    os.homedir(),
+    `.pg-nano/${dbname}+${md5Hex(`${host}:${port}`)}`,
+  )
 
   const moduleName = 'customTypeParsers'
 
@@ -105,4 +109,8 @@ function queryCustomTypes(conn: Connection) {
         AND typnamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace)
     `,
   )
+}
+
+function md5Hex(value: string) {
+  return crypto.createHash('md5').update(value).digest('hex')
 }
