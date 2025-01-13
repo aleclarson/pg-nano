@@ -1,7 +1,6 @@
 import * as devalue from 'devalue'
 import { pick, uid } from 'radashi'
 import type { RunnerTask, SerializedConfig } from 'vitest'
-import type { VitestExecutor } from 'vitest/execute'
 import { VitestTestRunner } from 'vitest/runners'
 import { getFn } from 'vitest/suite'
 import WebSocket from 'ws'
@@ -10,12 +9,9 @@ import type { Message, Request, Response } from './message'
 export default class extends VitestTestRunner {
   ws: WebSocket
   requests = new Map<string, (error: any, result: any) => void>()
-  executor: VitestExecutor
 
   constructor(config: SerializedConfig) {
     super(config)
-
-    this.executor = (this as any).__vitest_executor
 
     const wsPath = config.environmentOptions?.wsPath
     if (!wsPath) {
